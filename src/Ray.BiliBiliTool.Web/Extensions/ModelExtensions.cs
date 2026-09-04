@@ -90,21 +90,17 @@ public static class ModelExtensions
     {
         var format = "G" + significantDigits;
         return span.TotalMilliseconds < 1000
-            ? span.TotalMilliseconds.ToString(format) + " ms"
+            ? span.TotalMilliseconds.ToString(format) + " 毫秒"
             : (
                 span.TotalSeconds < 60
-                    ? span.TotalSeconds.ToString(format)
-                        + (span.TotalSeconds == 1 ? " sec" : " secs")
+                    ? span.TotalSeconds.ToString(format) + " 秒"
                     : (
                         span.TotalMinutes < 60
-                            ? span.TotalMinutes.ToString(format)
-                                + (span.TotalMinutes == 1 ? " min" : " mins")
+                            ? span.TotalMinutes.ToString(format) + " 分钟"
                             : (
                                 span.TotalHours < 24
-                                    ? span.TotalHours.ToString(format)
-                                        + (span.TotalHours == 1 ? " hr" : " hrs")
-                                    : span.TotalDays.ToString(format)
-                                        + (span.TotalDays == 1 ? " day" : " days")
+                                    ? span.TotalHours.ToString(format) + " 小时"
+                                    : span.TotalDays.ToString(format) + " 天"
                             )
                     )
             );

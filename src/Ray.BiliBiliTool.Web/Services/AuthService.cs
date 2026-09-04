@@ -47,7 +47,7 @@ public class AuthService(IDbContextFactory<BiliDbContext> dbFactory) : IAuthServ
 
         if (!PasswordHelper.VerifyPassword(currentPassword, user.Salt, user.PasswordHash))
         {
-            throw new Exception("Current password is incorrect.");
+            throw new Exception("当前密码错误，请重新输入。");
         }
 
         var (hash, salt) = PasswordHelper.HashPassword(newPassword);

@@ -3,9 +3,9 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 
-<PageTitle>Change Password</PageTitle>
+<PageTitle>管理账户</PageTitle>
 
-<MudText Typo="Typo.h5">Change Password</MudText>
+<MudText Typo="Typo.h5">修改账户信息</MudText>
 
 <MudCard Class="mx-auto my-4" Style="max-width: 500px;">
     <MudCardContent>
@@ -17,20 +17,20 @@
         {
             <MudAlert Severity="Severity.Success" Class="mb-3">@_successMessage</MudAlert>
         }
-        <MudTextField @bind-Value="_username" Label="New User Name" Required="true" RequiredError="Username cannot be empty" />
-        <MudTextField @bind-Value="_currentPassword" Label="Current Password" Required="true" RequiredError="Password cannot be empty"
+        <MudTextField @bind-Value="_username" Label="用户名" Required="true" RequiredError="用户名不能为空" />
+        <MudTextField @bind-Value="_currentPassword" Label="当前密码" Required="true" RequiredError="密码不能为空"
                       InputType="@_currentPasswordInput" Adornment="Adornment.End"
                       AdornmentIcon="@_currentPasswordInputIcon" OnAdornmentClick="ToggleCurrentPasswordVisibility" />
-        <MudTextField @bind-Value="_newPassword" Label="New Password" Required="true" RequiredError="Password cannot be empty"
+        <MudTextField @bind-Value="_newPassword" Label="新密码" Required="true" RequiredError="密码不能为空"
                       InputType="@_passwordInput" Adornment="Adornment.End"
                       AdornmentIcon="@_passwordInputIcon" OnAdornmentClick="TogglePasswordVisibility" />
-        <MudTextField @bind-Value="_confirmPassword" Label="Confirm Password" Required="true" RequiredError="Password cannot be empty"
+        <MudTextField @bind-Value="_confirmPassword" Label="确认新密码" Required="true" RequiredError="密码不能为空"
                       InputType="@_passwordInput" Adornment="Adornment.End"
                       AdornmentIcon="@_passwordInputIcon" OnAdornmentClick="TogglePasswordVisibility" />
     </MudCardContent>
     <MudCardActions>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ChangePasswordAsync"
-                   Class="ml-auto">Submit</MudButton>
+                   Class="ml-auto">提交修改</MudButton>
     </MudCardActions>
 </MudCard>
 

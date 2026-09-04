@@ -71,20 +71,20 @@ public partial class Admin : ComponentBase
 
         if (_newPassword != _confirmPassword)
         {
-            _errorMessage = "The new password and the confirm password do not match";
+            _errorMessage = "两次输入的新密码不一致";
             return;
         }
 
         if (string.IsNullOrWhiteSpace(_newPassword))
         {
-            _errorMessage = "Password cannot be empty";
+            _errorMessage = "新密码不能为空";
             return;
         }
 
         try
         {
             await AuthService.ChangePasswordAsync(_username, _currentPassword, _newPassword);
-            _successMessage = "Update Successful, you will be logged out in 2 seconds";
+            _successMessage = "修改成功，将在 2 秒后退出登录，请使用新密码重新登录。";
             await Task.Delay(2000);
             _currentPassword = "";
             _newPassword = "";

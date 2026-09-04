@@ -189,7 +189,7 @@ public partial class Schedules : ComponentBase, IDisposable
             catch (Exception ex)
             {
                 Snackbar.Add(
-                    $"Cannot update trigger status. Found more than one schedule with trigger {triggerKey}",
+                    $"无法更新触发器状态：存在多个与触发器 {triggerKey} 匹配的任务",
                     Severity.Warning
                 );
                 Logger.LogWarning(
@@ -369,7 +369,7 @@ public partial class Schedules : ComponentBase, IDisposable
     {
         if (model.TriggerName == null)
         {
-            Snackbar.Add("Cannot resume schedule. Trigger name is null.", Severity.Error);
+            Snackbar.Add("无法恢复任务：触发器名称为空。", Severity.Error);
             return;
         }
 
@@ -380,7 +380,7 @@ public partial class Schedules : ComponentBase, IDisposable
     {
         if (model.TriggerName == null)
         {
-            Snackbar.Add("Cannot pause schedule. Trigger name is null.", Severity.Error);
+            Snackbar.Add("无法暂停任务：触发器名称为空。", Severity.Error);
             return;
         }
 
@@ -413,7 +413,7 @@ public partial class Schedules : ComponentBase, IDisposable
                     )
                     : null,
         };
-        DialogSvc.ShowAsync<HistoryDialog>("Execution History", parameters, options);
+        DialogSvc.ShowAsync<HistoryDialog>("执行历史", parameters, options);
     }
 
     private void OnLogs(ScheduleModel model)
@@ -441,22 +441,22 @@ public partial class Schedules : ComponentBase, IDisposable
                     )
                     : null,
         };
-        DialogSvc.ShowAsync<LogsDialog>("Logs", parameters, options);
+        DialogSvc.ShowAsync<LogsDialog>("日志", parameters, options);
     }
 
     private async Task OnTriggerNow(ScheduleModel model)
     {
         if (model.JobName == null)
         {
-            Snackbar.Add("Cannot add trigger. Check if job still exists.", Severity.Error);
+            Snackbar.Add("无法立即执行：请确认任务仍然存在。", Severity.Error);
             return;
         }
 
         bool? result = await DialogSvc.ShowMessageBox(
-            title: "Confirm",
-            markupMessage: (MarkupString)"Do you want to trigger this job now?",
-            yesText: "Trigger",
-            cancelText: "Cancel"
+            title: "确认操作",
+            markupMessage: (MarkupString)"确定要立即执行此任务吗？",
+            yesText: "立即执行",
+            cancelText: "取消"
         );
 
         if (result != true)

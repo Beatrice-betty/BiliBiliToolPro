@@ -13,7 +13,7 @@ public static class ExecutionLogExtensions
 
         if (log.ReturnCode != null)
         {
-            strBldr.Append("Return " + log.ReturnCode + ". ");
+            strBldr.Append("返回码 " + log.ReturnCode + "。");
         }
 
         if (log.Result != null)
@@ -28,15 +28,15 @@ public static class ExecutionLogExtensions
         {
             if (log.IsSuccess is null)
             {
-                strBldr.Append("Executing...");
+                strBldr.Append("任务执行中…");
             }
             else if (log.IsSuccess.Value)
             {
-                strBldr.Append("Job executed successfully.");
+                strBldr.Append("任务执行成功。");
             }
             else
             {
-                strBldr.Append("Failed to execute job.");
+                strBldr.Append("任务执行失败。");
             }
         }
 
@@ -49,7 +49,7 @@ public static class ExecutionLogExtensions
 
         if (log.ReturnCode != null)
         {
-            strBldr.Append("Return " + log.ReturnCode + ". ");
+            strBldr.Append("返回码 " + log.ReturnCode + "。");
         }
 
         if (log.ErrorMessage != null)

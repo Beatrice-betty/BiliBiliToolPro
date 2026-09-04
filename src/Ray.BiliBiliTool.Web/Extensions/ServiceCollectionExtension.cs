@@ -10,6 +10,7 @@ public static class ServiceCollectionExtension
     public static IServiceCollection AddWebServices(this IServiceCollection services)
     {
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IBiliAccountManageService, BiliAccountManageService>();
 
         return services;
     }

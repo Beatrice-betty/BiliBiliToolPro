@@ -1,0 +1,126 @@
+@page "/Accounts"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Ray.BiliBiliTool.Web.Services
+
+<PageTitle>账号管理</PageTitle>
+
+<MudContainer Class="mt-4 mb-4">
+    <div class="d-flex justify-space-between align-center flex-wrap mb-4" style="gap: 8px;">
+        <MudText Typo="Typo.h4">B 站账号管理</MudText>
+        <div class="d-flex" style="gap: 8px;">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       OnClick="@(() => LoadAccountsAsync(true))"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@_loading">刷新状态</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="ShowAddAccountDialogAsync"
+                       StartIcon="@Icons.Material.Filled.QrCode">添加账号</MudButton>
+        </div>
+    </div>
+
+    <MudAlert Severity="Severity.Info" Class="mb-4" Elevation="1">
+        支持添加多个 B 站账号；添加后，各定时任务会<b>依次对每个账号执行</b>。此处仅显示账号的基础信息，
+        完整的 Cookie 登录凭证只保存在服务器本地（config/cookies.json），不会显示在页面中。
+    </MudAlert>
+
+    @if (_loading && _accounts.Count == 0)
+    {
+        <div class="text-center my-8">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large"/>
+            <MudText Class="mt-3 mud-text-secondary">正在加载账号信息…</MudText>
+        </div>
+    }
+    else if (_accounts.Count == 0)
+    {
+        <MudCard Class="my-8" Style="max-width: 560px; margin-left: auto; margin-right: auto;">
+            <MudCardContent>
+                <div class="text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Class="mud-text-secondary"/>
+                    <MudText Typo="Typo.h6" Class="mt-2">还没有添加任何 B 站账号</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+                        点击右上角「添加账号」，用手机 B 站 App 扫码即可完成添加。
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               OnClick="ShowAddAccountDialogAsync"
+                               StartIcon="@Icons.Material.Filled.QrCode">添加账号</MudButton>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    }
+    else
+    {
+        <MudPaper Class="pa-0 mud-elevation-1" Style="overflow-x: auto;">
+            <table class="mud-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                <tr>
+                    <th class="mud-table-cell" style="width: 70px;">序号</th>
+                    <th class="mud-table-cell">UID</th>
+                    <th class="mud-table-cell">昵称</th>
+                    <th class="mud-table-cell">等级</th>
+                    <th class="mud-table-cell">登录状态</th>
+                    <th class="mud-table-cell">最近检测</th>
+                    <th class="mud-table-cell">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var account in _accounts)
+                {
+                    <tr class="mud-table-row">
+                        <td class="mud-table-cell">#@(account.Index + 1)</td>
+                        <td class="mud-table-cell">@account.UserId</td>
+                        <td class="mud-table-cell">@(string.IsNullOrWhiteSpace(account.UserName) ? "—" : account.UserName)</td>
+                        <td class="mud-table-cell">@(account.Level.HasValue ? "Lv." + account.Level : "—")</td>
+                        <td class="mud-table-cell">
+                            @if (account.IsValid == true)
+                            {
+                                <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1"/>有效
+                                </MudChip>
+                            }
+                            else if (account.IsValid == false)
+                            {
+                                <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">
+                                    <MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Class="mr-1"/>无效
+                                </MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">未检测</MudChip>
+                            }
+                            <MudTooltip Duration="1000" Text="@(string.IsNullOrWhiteSpace(account.StatusText) ? "" : account.StatusText)">
+                                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="ml-1 mud-text-secondary"/>
+                            </MudTooltip>
+                        </td>
+                        <td class="mud-table-cell">@(account.LastCheckedAt?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                        <td class="mud-table-cell">
+                            <div class="d-flex" style="gap: 4px;">
+                                <MudTooltip Duration="1000" Text="重新检测账号状态">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => CheckSingleAccountAsync(account))"></MudIconButton>
+                                </MudTooltip>
+                                <MudTooltip Duration="1000" Text="@(account.UserId > 0 ? "删除此账号" : "该账号无法识别，无法删除")">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   Disabled="@(account.UserId <= 0 || _busy)"
+                                                   OnClick="@(() => DeleteAccountAsync(account))"></MudIconButton>
+                                </MudTooltip>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </MudPaper>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mt-3">
+            共 @_accounts.Count 个账号。任务将按上表顺序依次对每个账号执行。
+        </MudText>
+    }
+</MudContainer>
+
+<MudThemeProvider/>
+<MudPopoverProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>

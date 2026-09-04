@@ -1,0 +1,59 @@
+@namespace Ray.BiliBiliTool.Web.Components.Pages.Accounts
+@using Ray.BiliBiliTool.Web.Services
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h5">添加 B 站账号</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body1" Class="mb-3">
+            请使用手机哔哩哔哩 App 扫描下方二维码，并在手机上确认登录。
+        </MudText>
+
+        @if (_finished)
+        {
+            <div class="text-center my-4">
+                <MudIcon Icon="@(_loginSuccess ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                         Size="Size.Large"
+                         Color="@(_loginSuccess ? Color.Success : Color.Error)"/>
+                <MudText Class="mt-2" Color="@(_loginSuccess ? Color.Success : Color.Error)">@_statusMessage</MudText>
+                @if (_loginSuccess)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">窗口即将自动关闭…</MudText>
+                }
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(_qrImageDataUrl))
+        {
+            <div class="text-center">
+                <img src="@_qrImageDataUrl" width="240" height="240" alt="B站登录二维码"/>
+            </div>
+        }
+        else if (_creating)
+        {
+            <div class="text-center my-6">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
+            </div>
+        }
+
+        @if (!_finished && !string.IsNullOrEmpty(_statusMessage))
+        {
+            <div class="d-flex align-center justify-center mt-3" style="gap: 8px;">
+                @if (_loginSuccess == false && _checking)
+                {
+                    <MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true"/>
+                }
+                <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="text-align:center;">@_statusMessage</MudText>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (!_finished && !_loginSuccess)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                       OnClick="GenerateQrCodeAsync"
+                       StartIcon="@Icons.Material.Filled.QrCode">重新生成二维码</MudButton>
+        }
+        <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="Close">关闭</MudButton>
+    </DialogActions>
+</MudDialog>
