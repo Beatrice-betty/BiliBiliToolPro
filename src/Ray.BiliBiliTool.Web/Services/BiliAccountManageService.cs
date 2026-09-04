@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using QRCoder;
@@ -33,8 +34,6 @@ public class BiliAccountManageService(
         (BiliAccountDto Dto, DateTime CheckedAtUtc)
     > _profileCache = new();
     private static readonly TimeSpan CacheLifeTime = TimeSpan.FromSeconds(45);
-
-    private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
     private static readonly SemaphoreSlim _fileLock = new(1, 1);
 
@@ -111,7 +110,11 @@ public class BiliAccountManageService(
         var contentStr = await check.Content.ReadAsStringAsync(cancellationToken);
         var content = JsonSerializer.Deserialize<BiliApiResponse<TokenDto>>(
             contentStr,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+            }
         );
 
         if (content?.Code != 0)
@@ -193,7 +196,7 @@ public class BiliAccountManageService(
             }
 
             root![CookieConfigSection] = keep;
-            var newJson = root.ToJsonString(_jsonOptions);
+            var newJson = SerializeCookiesJson(root);
             await File.WriteAllTextAsync(
                 path,
                 newJson,
@@ -451,6 +454,21 @@ public class BiliAccountManageService(
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// 将 cookies.json 根节点序列化为带缩进的多行 JSON。
+    /// 注意：.NET 8 的 JsonNode.ToJsonString(JsonSerializerOptions) 要求 options 必须指定
+    /// TypeInfoResolver，否则会抛出 InvalidOperationException。
+    /// </summary>
+    private static string SerializeCookiesJson(JsonNode root)
+    {
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+        };
+        return root.ToJsonString(options);
     }
 
     private void ReloadConfiguration()
