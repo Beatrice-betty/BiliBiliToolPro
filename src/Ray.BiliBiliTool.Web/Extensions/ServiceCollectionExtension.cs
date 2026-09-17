@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
+using Ray.BiliBiliTool.Application.Contracts;
 using Ray.BiliBiliTool.Web.Auth;
 using Ray.BiliBiliTool.Web.Services;
 
@@ -11,6 +12,7 @@ public static class ServiceCollectionExtension
     {
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IBiliAccountManageService, BiliAccountManageService>();
+        services.AddSingleton<ITaskRecordWriter, TaskRecordWriter>();
 
         return services;
     }
