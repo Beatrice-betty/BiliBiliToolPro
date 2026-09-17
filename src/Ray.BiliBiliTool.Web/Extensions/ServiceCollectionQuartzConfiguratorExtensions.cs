@@ -49,9 +49,7 @@ public static class ServiceCollectionQuartzConfiguratorExtensions
         quartz.AddTrigger(opts =>
             opts.ForJob(VipPrivilegeJob.Key)
                 .WithIdentity($"{VipPrivilegeJob.Key}.Cron.Trigger", Constants.BiliJobGroup)
-                .WithCronSchedule(
-                    configuration["VipPrivilegeConfig:Cron"] ?? DefaultCron
-                )
+                .WithCronSchedule(configuration["VipPrivilegeConfig:Cron"] ?? DefaultCron)
         );
 
         // Silver2Coin job
@@ -100,6 +98,21 @@ public static class ServiceCollectionQuartzConfiguratorExtensions
             opts.ForJob(UnfollowBatchedJob.Key)
                 .WithIdentity($"{UnfollowBatchedJob.Key}.Cron.Trigger", Constants.BiliJobGroup)
                 .WithCronSchedule(configuration["UnfollowBatchedTaskConfig:Cron"] ?? DefaultCron)
+        );
+
+        // 自动补做 job（固定间隔触发，不是 Cron）
+        var autoRecoverInterval = Math.Clamp(
+            configuration.GetValue("AutoRecoverConfig:IntervalHours", 2),
+            1,
+            24
+        );
+
+        quartz.AddJob<AutoRecoverJob>(opts => opts.WithIdentity(AutoRecoverJob.Key));
+        quartz.AddTrigger(opts =>
+            opts.ForJob(AutoRecoverJob.Key)
+                .WithIdentity(AutoRecoverJob.TriggerKeyValue)
+                .StartAt(DateTimeOffset.UtcNow.AddMinutes(1))
+                .WithSimpleSchedule(x => x.WithIntervalInHours(autoRecoverInterval).RepeatForever())
         );
 
         // Test bili job

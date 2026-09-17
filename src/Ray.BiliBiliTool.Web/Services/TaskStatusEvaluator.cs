@@ -93,6 +93,15 @@ public static class TaskStatusEvaluator
         return new(TodayTaskItemState.NotDone, null, completedAt, ctx.AutoAttempts);
     }
 
+    /// <summary>
+    /// 是否允许「自动补做」。
+    /// 除了状态本身要是未执行/失败之外，分享必须排除：B 站对该接口恒返回 -403（已实测连续 13 天
+    /// 100% 失败），自动重试纯属浪费，规格 §5.4 规定它只允许手动补做。
+    /// </summary>
+    public static bool CanAutoRedo(TodayTaskItemContext ctx, TodayTaskItemResult result) =>
+        result.State is TodayTaskItemState.NotDone or TodayTaskItemState.Failed
+        && ctx.Item.ItemKey != TaskCatalog.ShareItemKey;
+
     private static bool IsCompleted(TodayTaskItemContext ctx) =>
         ctx.Item.Source switch
         {

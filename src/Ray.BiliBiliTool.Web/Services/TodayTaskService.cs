@@ -7,6 +7,7 @@ using Ray.BiliBiliTool.Domain;
 using Ray.BiliBiliTool.DomainService.Interfaces;
 using Ray.BiliBiliTool.Infrastructure.Cookie;
 using Ray.BiliBiliTool.Infrastructure.EF;
+using Ray.BiliBiliTool.Web.Jobs;
 
 namespace Ray.BiliBiliTool.Web.Services;
 
@@ -125,6 +126,7 @@ public class TodayTaskService(
                             CompletedAt = evaluated.CompletedAt,
                             AutoAttempts = evaluated.AutoAttempts,
                             AttemptedToday = taskRecords.Count > 0,
+                            CanAutoRedo = TaskStatusEvaluator.CanAutoRedo(ctx, evaluated),
                             CanDisableShare =
                                 item.ItemKey == TaskCatalog.ShareItemKey
                                 && item.IsEnabled(configuration),
@@ -428,9 +430,8 @@ public class TodayTaskService(
         provider.BatchSet(values);
         root.Reload();
 
-        // 间隔小时数变了需要重建 Quartz 触发器；AutoRecoverJob 在任务 6 创建后启用下面这行。
-        // await AutoRecoverJob.RescheduleAsync(schedulerFactory);
-        _ = schedulerFactory;
+        // 间隔小时数变了要重建 Quartz 触发器
+        await AutoRecoverJob.RescheduleAsync(schedulerFactory);
     }
 
     private static string Describe(TodayTaskItemState state) =>

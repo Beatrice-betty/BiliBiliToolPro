@@ -21,6 +21,9 @@ public sealed class TodayTaskItemDto
                 or TodayTaskItemState.Failed
                 or TodayTaskItemState.RetryExhausted;
 
+    /// <summary>是否允许自动补做（分享恒为 false，见 TaskStatusEvaluator.CanAutoRedo）</summary>
+    public bool CanAutoRedo { get; init; }
+
     /// <summary>是否显示「不再尝试」按钮（仅分享且仍开启时）</summary>
     public bool CanDisableShare { get; init; }
 }

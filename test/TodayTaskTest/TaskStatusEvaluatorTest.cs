@@ -192,6 +192,71 @@ public class TaskStatusEvaluatorTest
         Assert.Equal(TodayTaskItemState.Failed, r.State);
         Assert.Equal("配置直播Cookie失败", r.Message);
     }
+
+    [Fact]
+    public void 漏做的项允许自动补做()
+    {
+        var ctx = Ctx("DonateCoin", bili: new(true, true, false, 0));
+        var result = TaskStatusEvaluator.Evaluate(ctx);
+
+        Assert.Equal(TodayTaskItemState.NotDone, result.State);
+        Assert.True(TaskStatusEvaluator.CanAutoRedo(ctx, result));
+    }
+
+    [Fact]
+    public void 失败但未达上限的项允许自动补做()
+    {
+        var ctx = Ctx(
+            "DonateCoin",
+            bili: new(true, true, false, 0),
+            records: [Rec(TaskRecordStatus.Success, null)]
+        );
+        var result = TaskStatusEvaluator.Evaluate(ctx);
+
+        Assert.Equal(TodayTaskItemState.Failed, result.State);
+        Assert.True(TaskStatusEvaluator.CanAutoRedo(ctx, result));
+    }
+
+    [Fact]
+    public void 分享永远不自动补做_避免每天白试三次()
+    {
+        var ctx = Ctx(
+            "Share",
+            bili: new(true, true, false, 50),
+            records: [Rec(TaskRecordStatus.Success, null)]
+        );
+        var result = TaskStatusEvaluator.Evaluate(ctx);
+
+        Assert.Equal(TodayTaskItemState.Failed, result.State);
+        Assert.False(TaskStatusEvaluator.CanAutoRedo(ctx, result));
+    }
+
+    [Fact]
+    public void 已达重试上限的项不自动补做()
+    {
+        var ctx = Ctx(
+            "DonateCoin",
+            autoAttempts: 3,
+            bili: new(true, true, false, 0),
+            records: [Rec(TaskRecordStatus.Failed, "DonateCoin", TaskRecordTrigger.Auto)]
+        );
+        var result = TaskStatusEvaluator.Evaluate(ctx);
+
+        Assert.Equal(TodayTaskItemState.RetryExhausted, result.State);
+        Assert.False(TaskStatusEvaluator.CanAutoRedo(ctx, result));
+    }
+
+    [Fact]
+    public void 已完成与状态未知的项都不自动补做()
+    {
+        var done = Ctx("Login", bili: new(true, true, false, 50));
+        Assert.False(TaskStatusEvaluator.CanAutoRedo(done, TaskStatusEvaluator.Evaluate(done)));
+
+        var unknown = Ctx("Login", biliQueryFailed: true);
+        Assert.False(
+            TaskStatusEvaluator.CanAutoRedo(unknown, TaskStatusEvaluator.Evaluate(unknown))
+        );
+    }
 }
 
 public class TaskCatalogTest
