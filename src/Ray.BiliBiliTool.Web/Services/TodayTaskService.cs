@@ -147,6 +147,7 @@ public class TodayTaskService(
         long userId,
         string taskKey,
         string? itemKey,
+        TaskRecordTrigger trigger = TaskRecordTrigger.Manual,
         CancellationToken cancellationToken = default
     )
     {
@@ -165,13 +166,7 @@ public class TodayTaskService(
         await RedoLock.WaitAsync(cancellationToken);
         try
         {
-            return await ExecuteAndRecordAsync(
-                userId,
-                task,
-                item,
-                TaskRecordTrigger.Manual,
-                cancellationToken
-            );
+            return await ExecuteAndRecordAsync(userId, task, item, trigger, cancellationToken);
         }
         finally
         {
@@ -245,6 +240,7 @@ public class TodayTaskService(
                     account.UserId,
                     group.TaskKey,
                     item.ItemKey,
+                    TaskRecordTrigger.Manual,
                     cancellationToken
                 );
                 count++;

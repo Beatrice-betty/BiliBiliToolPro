@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Quartz;
 using Ray.BiliBiliTool.Config.Options;
+using Ray.BiliBiliTool.Domain;
 using Ray.BiliBiliTool.Infrastructure;
 using Ray.BiliBiliTool.Infrastructure.EF;
 using Ray.BiliBiliTool.Web.Services;
@@ -63,6 +64,7 @@ public class AutoRecoverJob(
                         account.UserId,
                         group.TaskKey,
                         item.ItemKey,
+                        TaskRecordTrigger.Auto,
                         context.CancellationToken
                     );
                     logger.LogInformation(

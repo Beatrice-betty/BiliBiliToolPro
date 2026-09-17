@@ -1,3 +1,5 @@
+using Ray.BiliBiliTool.Domain;
+
 namespace Ray.BiliBiliTool.Web.Services;
 
 /// <summary>页面上单个检查项的展示数据</summary>
@@ -55,10 +57,15 @@ public interface ITodayTaskService
         CancellationToken cancellationToken = default
     );
 
+    /// <summary>
+    /// 补做单项。trigger 用于区分「自动补做」与「手动补做」——
+    /// 自动补做的次数上限就是靠统计 Trigger=Auto 的记录实现的，传错会导致上限失效。
+    /// </summary>
     Task<TaskRedoResultDto> RedoAsync(
         long userId,
         string taskKey,
         string? itemKey,
+        TaskRecordTrigger trigger = TaskRecordTrigger.Manual,
         CancellationToken cancellationToken = default
     );
 
