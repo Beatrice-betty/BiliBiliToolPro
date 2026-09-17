@@ -14,6 +14,7 @@ public static class ServiceCollectionExtension
         services.AddScoped<IBiliAccountManageService, BiliAccountManageService>();
         services.AddSingleton<ITaskRecordWriter, TaskRecordWriter>();
         services.AddScoped<TaskRecoveryExecutor>();
+        services.AddScoped<ITodayTaskService, TodayTaskService>();
 
         return services;
     }
