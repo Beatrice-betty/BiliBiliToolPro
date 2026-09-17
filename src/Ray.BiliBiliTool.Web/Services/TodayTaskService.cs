@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Quartz;
 using Ray.BiliBiliTool.Agent;
+using Ray.BiliBiliTool.Application.Contracts;
 using Ray.BiliBiliTool.Config.SQLite;
 using Ray.BiliBiliTool.Domain;
 using Ray.BiliBiliTool.DomainService.Interfaces;
@@ -23,6 +24,7 @@ public class TodayTaskService(
     ICoinDomainService coinDomainService,
     IBiliAccountManageService accountManageService,
     TaskRecoveryExecutor recoveryExecutor,
+    ITaskRecordWriter recordWriter,
     ILogger<TodayTaskService> logger
 ) : ITodayTaskService
 {
@@ -308,59 +310,31 @@ public class TodayTaskService(
         CancellationToken cancellationToken
     )
     {
+        string? error = null;
         try
         {
             await recoveryExecutor.ExecuteAsync(userId, task, item, cancellationToken);
-            await WriteRecordAsync(
-                userId,
-                task.TaskKey,
-                item.ItemKey,
-                TaskRecordStatus.Success,
-                null,
-                trigger,
-                cancellationToken
-            );
-            return new TaskRedoResultDto(true, $"{item.DisplayName}：执行完成");
         }
         catch (Exception ex)
         {
-            await WriteRecordAsync(
-                userId,
-                task.TaskKey,
-                item.ItemKey,
-                TaskRecordStatus.Failed,
-                ex.Message,
-                trigger,
-                cancellationToken
-            );
-            return new TaskRedoResultDto(false, $"{item.DisplayName}：{ex.Message}");
+            error = ex.Message;
         }
-    }
 
-    private async Task WriteRecordAsync(
-        long userId,
-        string taskKey,
-        string? itemKey,
-        TaskRecordStatus status,
-        string? message,
-        TaskRecordTrigger trigger,
-        CancellationToken cancellationToken
-    )
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        db.TaskRecords.Add(
-            new TaskRecord
-            {
-                UserId = userId,
-                TaskKey = taskKey,
-                TaskItemKey = itemKey,
-                RecordDate = DateTimeOffset.Now.ToString("yyyy-MM-dd"),
-                Status = status,
-                Message = message is { Length: > 512 } ? message[..512] : message,
-                Trigger = trigger,
-            }
+        // 记录写入交给 ITaskRecordWriter：它内部会吞掉写库异常。
+        // 若在这里直接写库并把写入和「任务执行」放进同一个 try，写库失败会被当成任务失败。
+        await recordWriter.WriteAsync(
+            userId,
+            task.TaskKey,
+            item.ItemKey,
+            error is null ? TaskRecordStatus.Success : TaskRecordStatus.Failed,
+            error,
+            trigger,
+            cancellationToken
         );
-        await db.SaveChangesAsync(cancellationToken);
+
+        return error is null
+            ? new TaskRedoResultDto(true, $"{item.DisplayName}：执行完成")
+            : new TaskRedoResultDto(false, $"{item.DisplayName}：{error}");
     }
 
     /// <summary>每个任务今天有没有触发点、是否已过今天的最后一次触发时间</summary>

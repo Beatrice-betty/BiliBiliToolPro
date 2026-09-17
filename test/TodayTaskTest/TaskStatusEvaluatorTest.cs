@@ -244,6 +244,10 @@ public class TaskStatusEvaluatorTest
 
         Assert.Equal(TodayTaskItemState.RetryExhausted, result.State);
         Assert.False(TaskStatusEvaluator.CanAutoRedo(ctx, result));
+
+        // 页面上的 StateText 已经写了「已自动重试 N 次仍未完成」，
+        // Message 必须为空，否则会渲染成重复文案。
+        Assert.Null(result.Message);
     }
 
     [Fact]

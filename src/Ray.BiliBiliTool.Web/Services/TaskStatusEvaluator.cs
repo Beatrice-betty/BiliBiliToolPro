@@ -60,12 +60,9 @@ public static class TaskStatusEvaluator
 
         if (ctx.AutoAttempts >= ctx.MaxAutoAttempts)
         {
-            return new(
-                TodayTaskItemState.RetryExhausted,
-                $"已自动重试 {ctx.AutoAttempts} 次仍未完成",
-                completedAt,
-                ctx.AutoAttempts
-            );
+            // 不再附 Message：页面上的 StateText 已经写了「已自动重试 N 次仍未完成」，
+            // 再给一条同义 Message 会渲染成重复文案。
+            return new(TodayTaskItemState.RetryExhausted, null, completedAt, ctx.AutoAttempts);
         }
 
         var latest = ctx.Records.LastOrDefault();
