@@ -221,8 +221,11 @@ public static class TaskDueTimeCalculator
         }
 
         var expression = new CronExpression(cron);
-        var start = new DateTimeOffset(day.Year, day.Month, day.Day, 0, 0, 0, day.Offset);
-        var end = start.AddDays(1);
+        // 起点回退 1 秒：Quartz 的 GetNextValidTimeAfter 返回「严格晚于」的时间，
+        // 不回退就会漏掉正好落在当天 00:00:00 的那一次触发。
+        var start = new DateTimeOffset(day.Year, day.Month, day.Day, 0, 0, 0, day.Offset)
+            .AddSeconds(-1);
+        var end = new DateTimeOffset(day.Year, day.Month, day.Day, 0, 0, 0, day.Offset).AddDays(1);
 
         var cursor = expression.GetNextValidTimeAfter(start);
         while (cursor.HasValue && cursor.Value < end)
@@ -378,6 +381,14 @@ dotnet ef migrations add AddTaskRecords --project src/Ray.BiliBiliTool.Infrastru
 
 - [ ] **步骤 4：创建写入接口与实现**
 
+> **先决条件：** `Ray.BiliBiliTool.Application.Contracts` 目前不引用 `Ray.BiliBiliTool.Domain`，而下面的接口签名用到 `TaskRecordStatus`。需要给 `src/Ray.BiliBiliTool.Application.Contracts/Ray.BiliBiliTool.Application.Contracts.csproj` 增加一条引用（Domain 自身无任何项目引用，不会成环）：
+>
+> ```xml
+>     <ProjectReference Include="..\Ray.BiliBiliTool.Domain\Ray.BiliBiliTool.Domain.csproj" />
+> ```
+>
+> 这样 `Application` 层也能透过它看到 `TaskRecordStatus`，无需再改 `Application` 的引用。
+
 `src/Ray.BiliBiliTool.Application.Contracts/ITaskRecordWriter.cs`：
 
 ```csharp
@@ -465,6 +476,8 @@ public class TaskRecordWriter(
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Ray.BiliBiliTool.Domain;
 using Ray.BiliBiliTool.Infrastructure.EF;
@@ -477,14 +490,27 @@ public class TaskRecordWriterTest : IDisposable
         Path.GetTempPath(),
         $"bilitool-test-{Guid.NewGuid():N}.db"
     );
+    private readonly ServiceProvider _provider;
     private readonly IDbContextFactory<BiliDbContext> _factory;
 
     public TaskRecordWriterTest()
     {
-        var options = new DbContextOptionsBuilder<BiliDbContext>()
-            .UseSqlite($"Data Source={_dbPath}")
-            .Options;
-        _factory = new PooledDbContextFactory<BiliDbContext>(options);
+        // BiliDbContext 的构造函数需要 IConfiguration，且连接串在 OnConfiguring 里从配置取，
+        // 因此直接用 DI 构造工厂，而不是手搓 DbContextOptions。
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:Sqlite"] = $"Data Source={_dbPath};Cache=Shared",
+                }
+            )
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(config);
+        services.AddDbContextFactory<BiliDbContext>();
+        _provider = services.BuildServiceProvider();
+        _factory = _provider.GetRequiredService<IDbContextFactory<BiliDbContext>>();
 
         using var db = _factory.CreateDbContext();
         db.Database.Migrate();
@@ -492,6 +518,7 @@ public class TaskRecordWriterTest : IDisposable
 
     public void Dispose()
     {
+        _provider.Dispose();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         if (File.Exists(_dbPath))
         {
@@ -1891,9 +1918,10 @@ public class TodayTaskService(
                         BiliReward = item.Source == TaskItemSource.BiliDailyReward ? biliReward : null,
                         BiliQueryFailed =
                             item.Source == TaskItemSource.BiliDailyReward && biliQueryFailed,
-                        Records = taskRecords
-                            .Where(r => r.TaskItemKey == item.ItemKey || (item.ItemKey is null && r.TaskItemKey is null))
-                            .ToList(),
+                        // 传该任务今天的全部记录：每日任务的子项（登录/观看/分享/投币）
+                        // 定时执行时只写任务级记录（TaskItemKey = null），子项级记录只在补做时产生。
+                        // 判定逻辑需要同时看到两类记录。
+                        Records = taskRecords,
                         AutoAttempts = autoAttempts,
                         MaxAutoAttempts = MaxAutoAttempts,
                     };
@@ -1970,38 +1998,49 @@ public class TodayTaskService(
     {
         var status = await GetTodayStatusAsync(true, cancellationToken);
         var account = status.FirstOrDefault(a => a.UserId == userId);
-        if (account is null)
-        {
-            return 0;
-        }
+        return account is null ? 0 : await RedoAccountAsync(account, cancellationToken);
+    }
+
+    public async Task<int> RedoAllMissingAsync(CancellationToken cancellationToken = default)
+    {
+        // 只查一次状态，避免逐账号重复请求 B 站接口
+        var status = await GetTodayStatusAsync(true, cancellationToken);
 
         var count = 0;
-        foreach (var group in account.Groups)
+        foreach (var account in status)
         {
-            foreach (var item in group.Items.Where(i => i.CanRedo))
-            {
-                var r = await RedoAsync(userId, group.TaskKey, item.ItemKey, cancellationToken);
-                count++;
-                logger.LogInformation(
-                    "补做 {user}/{task}/{item}：{result}",
-                    userId,
-                    group.TaskKey,
-                    item.ItemKey,
-                    r.Message
-                );
-            }
+            count += await RedoAccountAsync(account, cancellationToken);
         }
 
         return count;
     }
 
-    public async Task<int> RedoAllMissingAsync(CancellationToken cancellationToken = default)
+    /// <summary>对已完成状态快照的账号执行全部可补做项</summary>
+    private async Task<int> RedoAccountAsync(
+        AccountTodayTasksDto account,
+        CancellationToken cancellationToken
+    )
     {
-        var status = await GetTodayStatusAsync(true, cancellationToken);
         var count = 0;
-        foreach (var account in status)
+        foreach (var group in account.Groups)
         {
-            count += await RedoAllForAccountAsync(account.UserId, cancellationToken);
+            foreach (var item in group.Items.Where(i => i.CanRedo))
+            {
+                var r = await RedoAsync(
+                    account.UserId,
+                    group.TaskKey,
+                    item.ItemKey,
+                    cancellationToken
+                );
+                count++;
+                logger.LogInformation(
+                    "补做 {user}/{task}/{item}：{result}",
+                    account.UserId,
+                    group.TaskKey,
+                    item.ItemKey,
+                    r.Message
+                );
+            }
         }
 
         return count;
@@ -2149,7 +2188,9 @@ public class TodayTaskService(
         provider.BatchSet(values!);
         root.Reload();
 
-        await AutoRecoverJob.RescheduleAsync(schedulerFactory);
+        // 间隔小时数变了需要重建 Quartz 触发器；AutoRecoverJob 在任务 6 创建，
+        // 到任务 6 时把这一行打开（届时它已存在，编译不会断）。
+        // await AutoRecoverJob.RescheduleAsync(schedulerFactory);
     }
 
     private static string Describe(TodayTaskItemState state) =>
@@ -2186,7 +2227,7 @@ public class TodayTaskService(
 dotnet build Ray.BiliBiliTool.sln
 ```
 
-预期：0 error（`AutoRecoverJob` 尚未创建会让本步骤报错，属于正常 —— 它在任务 6 创建；如需提前解耦，可先把 `SaveSettingsAsync` 里对 `AutoRecoverJob.RescheduleAsync` 的调用留到任务 6 再加）。
+预期：0 error。（`SaveSettingsAsync` 中对 `AutoRecoverJob.RescheduleAsync` 的调用此刻是注释状态，到任务 6 再打开。）
 
 - [ ] **步骤 5：Commit**
 
@@ -2410,7 +2451,15 @@ public class AutoRecoverJob(
   },
 ```
 
-- [ ] **步骤 6：编译并启动验证**
+- [ ] **步骤 6：打开设置保存后的重新调度**
+
+`src/Ray.BiliBiliTool.Web/Services/TodayTaskService.cs` 中，把这一行的注释去掉，并补 `using Ray.BiliBiliTool.Web.Jobs;`：
+
+```csharp
+        await AutoRecoverJob.RescheduleAsync(schedulerFactory);
+```
+
+- [ ] **步骤 7：编译并启动验证**
 
 ```bash
 dotnet build Ray.BiliBiliTool.sln
@@ -2418,11 +2467,11 @@ dotnet build Ray.BiliBiliTool.sln
 
 预期：0 error。
 
-- [ ] **步骤 7：Commit**
+- [ ] **步骤 8：Commit**
 
 ```bash
-git add src/Ray.BiliBiliTool.Config/Options/AutoRecoverOptions.cs src/Ray.BiliBiliTool.Config/Extensions/ServiceCollectionExtension.cs src/Ray.BiliBiliTool.Web/Jobs/AutoRecoverJob.cs src/Ray.BiliBiliTool.Web/Extensions/ServiceCollectionQuartzConfiguratorExtensions.cs src/Ray.BiliBiliTool.Web/appsettings.json
-git commit -m "feat(today): 新增自动补做定时任务与配置项"
+git add src/Ray.BiliBiliTool.Config/Options/AutoRecoverOptions.cs src/Ray.BiliBiliTool.Config/Extensions/ServiceCollectionExtension.cs src/Ray.BiliBiliTool.Web/Jobs/AutoRecoverJob.cs src/Ray.BiliBiliTool.Web/Extensions/ServiceCollectionQuartzConfiguratorExtensions.cs src/Ray.BiliBiliTool.Web/Services/TodayTaskService.cs src/Ray.BiliBiliTool.Web/appsettings.json
+git commit -m "feat(today): 新增自动补做定时任务与配置项（任务 6/8）"
 ```
 
 ---
