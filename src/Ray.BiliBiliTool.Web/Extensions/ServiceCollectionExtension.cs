@@ -13,6 +13,7 @@ public static class ServiceCollectionExtension
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IBiliAccountManageService, BiliAccountManageService>();
         services.AddSingleton<ITaskRecordWriter, TaskRecordWriter>();
+        services.AddScoped<TaskRecoveryExecutor>();
 
         return services;
     }

@@ -204,7 +204,7 @@ public class VideoDomainService(
     /// </summary>
     /// <param name="videoInfo"></param>
     /// <returns></returns>
-    private async Task<bool> OpenVideo(VideoInfoDto videoInfo, BiliCookie ck)
+    public async Task<bool> OpenVideo(VideoInfoDto videoInfo, BiliCookie ck)
     {
         var request = new UploadVideoHeartbeatRequest
         {
@@ -236,7 +236,7 @@ public class VideoDomainService(
     /// 获取一个视频用来观看并分享
     /// </summary>
     /// <returns></returns>
-    private async Task<VideoInfoDto> GetRandomVideoForWatchAndShare(BiliCookie ck)
+    public async Task<VideoInfoDto> GetRandomVideoForWatchAndShare(BiliCookie ck)
     {
         //先从配置的或关注的up中取
         var video = await GetRandomVideoOfFollowingUps(ck);
